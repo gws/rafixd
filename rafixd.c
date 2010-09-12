@@ -121,7 +121,7 @@ static void timeval_sub __P((struct timeval *, struct timeval *,
 static void timeval_add __P((struct timeval *, struct timeval *,
     struct timeval *));
 
-static void dprintf __P((int, const char *, const char *, ...));
+static void dbgprintf __P((int, const char *, const char *, ...));
 static void usage __P((void));
 
 int
@@ -202,7 +202,7 @@ main(argc, argv)
 	TAILQ_INIT(&router_list);
 
 	if (inet_pton(AF_INET6, "ff02::1", &all_nodes_addr) != 1) {
-		dprintf(LOG_ERR, FNAME, "failed to convert all nodes address");
+		dbgprintf(LOG_ERR, FNAME, "failed to convert all nodes address");
 		exit(1);
 	}
 
@@ -211,11 +211,11 @@ main(argc, argv)
 
 	fdmasks = howmany(s + 1, NFDBITS) * sizeof(fd_mask);
 	if ((fdsetp = malloc(fdmasks)) == NULL) {
-		dprintf(LOG_NOTICE, FNAME, "fd mask allocation failed");
+		dbgprintf(LOG_NOTICE, FNAME, "fd mask allocation failed");
 		exit(1);
 	}
 	if ((selectfdp = malloc(fdmasks)) == NULL) {
-		dprintf(LOG_NOTICE, FNAME, "fd set allocation failed");
+		dbgprintf(LOG_NOTICE, FNAME, "fd set allocation failed");
 		exit(1);
 	}
 	memset(fdsetp, 0, fdmasks);
@@ -247,7 +247,7 @@ add_interface(ifname)
 	/* check duplication */
 	for (ifp = iflist; ifp; ifp = ifp->next) {
 		if (strcmp(ifp->ifname, ifname) == 0) {
-			dprintf(LOG_INFO, FNAME, "duplicated interface: %s",
+			dbgprintf(LOG_INFO, FNAME, "duplicated interface: %s",
 			    ifname);
 			return (0);
 		}
@@ -255,13 +255,13 @@ add_interface(ifname)
 
 	/* validate interface name */
 	if ((index = if_nametoindex(ifname)) == 0) {
-		dprintf(LOG_INFO, FNAME, "bad interface name: %s", ifname);
+		dbgprintf(LOG_INFO, FNAME, "bad interface name: %s", ifname);
 		return (-1);
 	}
 
 	/* add the interface */
 	if ((ifp = malloc(sizeof(*ifp))) == NULL) {
-		dprintf(LOG_NOTICE, FNAME, "memory allocation failed");
+		dbgprintf(LOG_NOTICE, FNAME, "memory allocation failed");
 		return (-1);
 	}
 	memset(ifp, 0, sizeof(*ifp));
@@ -278,7 +278,7 @@ add_interface(ifname)
 	ifp->next = iflist;
 	iflist = ifp;
 
-	dprintf(LOG_DEBUG, FNAME, "added interface %s", ifname);
+	dbgprintf(LOG_DEBUG, FNAME, "added interface %s", ifname);
 
 	return (0);
 }
@@ -419,7 +419,7 @@ static void
 remove_router(rtp)
 	struct router *rtp;
 {
-	dprintf(LOG_INFO, FNAME, "remove a router: %s on %s",
+	dbgprintf(LOG_INFO, FNAME, "remove a router: %s on %s",
 	    in6addr2str(&rtp->address, 0), rtp->interface->ifname);
 
 	TAILQ_REMOVE(&router_list, rtp, link);
@@ -436,7 +436,7 @@ add_router(in6, ifp)
 	struct timeval now, tv_delay;
 
 	if ((new = malloc(sizeof(*new))) == NULL) {
-		dprintf(LOG_NOTICE, FNAME, "memory allocation failed");
+		dbgprintf(LOG_NOTICE, FNAME, "memory allocation failed");
 		return;
 	}
 	memset(new, 0, sizeof(*new));
@@ -456,7 +456,7 @@ add_router(in6, ifp)
 	gettimeofday(&now, NULL);
 	timeval_add(&now, &tv_delay, &new->expire);
 
-	dprintf(LOG_DEBUG, FNAME, "added a bogus router %s on %s "
+	dbgprintf(LOG_DEBUG, FNAME, "added a bogus router %s on %s "
 	    "expiring in %lumsec", in6addr2str(in6, 0), ifp->ifname, delay);
 
 	TAILQ_INSERT_TAIL(&router_list, new, link);
@@ -475,7 +475,7 @@ purge_router(rtp)
 		return;
 	lhlen = linkhdrlen(fd, rtp->interface->ifname);
 	if (lhlen < 0) {
-		dprintf(LOG_NOTICE, FNAME, "unsupported interface %s",
+		dbgprintf(LOG_NOTICE, FNAME, "unsupported interface %s",
 		    rtp->interface->ifname);
 		goto end;
 	}
@@ -483,7 +483,7 @@ purge_router(rtp)
 	sendlen = lhlen + sizeof(struct ip6_hdr) +
 	    sizeof(struct nd_router_advert);
 	if ((sendbuf = malloc(sendlen)) == NULL) {
-		dprintf(LOG_NOTICE, FNAME, "failed to allocate send buffer");
+		dbgprintf(LOG_NOTICE, FNAME, "failed to allocate send buffer");
 		goto end;
 	}
 	memset(sendbuf, 0, sendlen);
@@ -506,19 +506,19 @@ purge_router(rtp)
 #ifndef HAVE_PF_PACKET
 		int slen;
 		if ((slen = write(fd, sendbuf, sendlen)) < 0) {
-			dprintf(LOG_NOTICE, FNAME, "bpf write failed: %s",
+			dbgprintf(LOG_NOTICE, FNAME, "bpf write failed: %s",
 			    strerror(errno));
 		} else {
-			dprintf(LOG_DEBUG, FNAME,
+			dbgprintf(LOG_DEBUG, FNAME,
 			    "sent a purge packet on %s, len = %d",
 			    rtp->interface->ifname, slen);
 		}
 #else
 		if (send(fd,sendbuf,sendlen,0) < 0) {
-			dprintf(LOG_NOTICE, FNAME, "PF_FAMILY write failed: %s",
+			dbgprintf(LOG_NOTICE, FNAME, "PF_FAMILY write failed: %s",
 			    strerror(errno));
 		} else {
-			dprintf(LOG_DEBUG, FNAME,
+			dbgprintf(LOG_DEBUG, FNAME,
 			    "sent a purge packet on %s",
 			    rtp->interface->ifname);
 		}
@@ -551,13 +551,13 @@ bpf_open(iface)
 	/* Using PF_PACKET socket */
 	fd=socket(PF_PACKET,SOCK_RAW,htons(0x86dd)) ; /* or ETH_P_ALL */
 	if (fd < 0) {
-		dprintf(LOG_NOTICE, FNAME, "failed to open a PF_PACKET socket");
+		dbgprintf(LOG_NOTICE, FNAME, "failed to open a PF_PACKET socket");
 		return (-1);
 	}
   
     /* get the interface id for the device */
     if ((sa.sll_ifindex = if_nametoindex(iface)) < 0) {
-	dprintf(LOG_NOTICE, FNAME, "failed to get the index of %s: %s",
+	dbgprintf(LOG_NOTICE, FNAME, "failed to get the index of %s: %s",
 		iface, strerror(errno));
         close(fd);
         return -1;
@@ -567,7 +567,7 @@ bpf_open(iface)
     sa.sll_family = AF_PACKET;
     sa.sll_protocol = htons(0x86dd);
     if (bind(fd, (struct sockaddr *)&sa, sizeof(sa)) < 0) {
-	dprintf(LOG_NOTICE, FNAME, "failed to bind PF_PACKET socket to %s: %s",
+	dbgprintf(LOG_NOTICE, FNAME, "failed to bind PF_PACKET socket to %s: %s",
 		iface, strerror(errno));
         close(fd);
         return -1;
@@ -575,14 +575,14 @@ bpf_open(iface)
    
     /* check for errors, network down, etc... */
     if (getsockopt(fd, SOL_SOCKET, SO_ERROR, &err, &errlen) < 0) {
-	dprintf(LOG_NOTICE, FNAME, "error while checking opening status of a PF_PACKET socket for %s: %s",
+	dbgprintf(LOG_NOTICE, FNAME, "error while checking opening status of a PF_PACKET socket for %s: %s",
 		iface, strerror(errno));
         close(fd);
         return -1;
     }
 
     if (err > 0) {
-	dprintf(LOG_NOTICE, FNAME, "error opening a PF_PACKET socket for %s: %s",
+	dbgprintf(LOG_NOTICE, FNAME, "error opening a PF_PACKET socket for %s: %s",
 		iface, strerror(err));
         close(fd);
         return -1;
@@ -594,7 +594,7 @@ bpf_open(iface)
 
     if (ioctl(fd, SIOCGIFHWADDR, &ifr) < 0) {
         close(fd);
-	dprintf(LOG_NOTICE, FNAME, "error getting hardware type of %s: %s",
+	dbgprintf(LOG_NOTICE, FNAME, "error getting hardware type of %s: %s",
 		iface, strerror(errno));
         return -1;
     }
@@ -604,7 +604,7 @@ bpf_open(iface)
         case ARPHRD_ETHER:
             break;
         default:
-		dprintf(LOG_NOTICE, FNAME, "%s unsupported physical layer type 0x%x",
+		dbgprintf(LOG_NOTICE, FNAME, "%s unsupported physical layer type 0x%x",
 			iface, ifr.ifr_hwaddr.sa_family);
 		close(fd);
 		return -1;
@@ -620,12 +620,12 @@ bpf_open(iface)
 	} while (fd < 0 && n < 4);
 
 	if (fd < 0) {
-		dprintf(LOG_NOTICE, FNAME, "failed to open a bpf interface");
+		dbgprintf(LOG_NOTICE, FNAME, "failed to open a bpf interface");
 		return (-1);
 	}
 
 	if (ioctl(fd, BIOCIMMEDIATE, &n) < 0) {
-		dprintf(LOG_NOTICE, FNAME, "ioctl(BIOCIMMEDIATE): %s",
+		dbgprintf(LOG_NOTICE, FNAME, "ioctl(BIOCIMMEDIATE): %s",
 		    strerror(errno));
 		return (-1);
 	}
@@ -655,7 +655,7 @@ linkhdrlen(fd, iface)
 	u_int v;
 
 	if (ioctl(fd, BIOCGDLT, (caddr_t)&v) < 0) {
-		dprintf(LOG_NOTICE, FNAME, "ioctl(BIOCGDLT): %s",
+		dbgprintf(LOG_NOTICE, FNAME, "ioctl(BIOCGDLT): %s",
 		    strerror(errno));
 		return (-1);
 	}
@@ -861,12 +861,12 @@ sockopen()
 	rcvcmsglen = CMSG_SPACE(sizeof(struct in6_pktinfo)) +
 	    CMSG_SPACE(sizeof(int));
 	if (rcvcmsgbuf == NULL && (rcvcmsgbuf = malloc(rcvcmsglen)) == NULL) {
-		dprintf(LOG_ERR, FNAME, "malloc for receive msghdr failed");
+		dbgprintf(LOG_ERR, FNAME, "malloc for receive msghdr failed");
 		return (-1);
 	}
 
 	if ((s = socket(AF_INET6, SOCK_RAW, IPPROTO_ICMPV6)) < 0) {
-		dprintf(LOG_ERR, FNAME, "socket: %s", strerror(errno));
+		dbgprintf(LOG_ERR, FNAME, "socket: %s", strerror(errno));
 		return (-1);
 	}
 
@@ -875,14 +875,14 @@ sockopen()
 #ifdef IPV6_RECVPKTINFO
 	if (setsockopt(s, IPPROTO_IPV6, IPV6_RECVPKTINFO, &on,
 	    sizeof(on)) < 0) {
-		dprintf(LOG_ERR, FNAME, "IPV6_RECVPKTINFO: %s",
+		dbgprintf(LOG_ERR, FNAME, "IPV6_RECVPKTINFO: %s",
 		    strerror(errno));
 		goto bad;
 	}
 #else
 	if (setsockopt(s, IPPROTO_IPV6, IPV6_PKTINFO, &on,
 	    sizeof(on)) < 0) {
-		dprintf(LOG_ERR, FNAME, "IPV6_PKTINFO: %s",
+		dbgprintf(LOG_ERR, FNAME, "IPV6_PKTINFO: %s",
 		    strerror(errno));
 		goto bad;
 	}
@@ -893,14 +893,14 @@ sockopen()
 #ifdef IPV6_RECVHOPLIMIT
 	if (setsockopt(s, IPPROTO_IPV6, IPV6_RECVHOPLIMIT, &on,
 	    sizeof(on)) < 0) {
-		dprintf(LOG_ERR, FNAME, "IPV6_RECVHOPLIMIT: %s",
+		dbgprintf(LOG_ERR, FNAME, "IPV6_RECVHOPLIMIT: %s",
 		    strerror(errno));
 		goto bad;
 	}
 #else
 	if (setsockopt(s, IPPROTO_IPV6, IPV6_HOPLIMIT, &on,
 	    sizeof(on)) < 0) {
-		dprintf(LOG_ERR, FNAME, "IPV6_HOPLIMIT: %s",
+		dbgprintf(LOG_ERR, FNAME, "IPV6_HOPLIMIT: %s",
 		    strerror(errno));
 		goto bad;
 	}
@@ -911,7 +911,7 @@ sockopen()
 	ICMP6_FILTER_SETPASS(ND_ROUTER_ADVERT, &filt);
 	if (setsockopt(s, IPPROTO_ICMPV6, ICMP6_FILTER, &filt,
 	    sizeof(filt)) == -1) {
-		dprintf(LOG_ERR, FNAME, "setsockopt(ICMP6_FILTER): %s",
+		dbgprintf(LOG_ERR, FNAME, "setsockopt(ICMP6_FILTER): %s",
 		    strerror(errno));
 		goto bad;
 	}
@@ -948,7 +948,7 @@ recv_ra(s)
 	rcvmhdr.msg_controllen = rcvcmsglen;
 
 	if ((len = recvmsg(s, &rcvmhdr, 0)) < 0) {
-		dprintf(LOG_NOTICE, FNAME, "recvmsg: %s", strerror(errno));
+		dbgprintf(LOG_NOTICE, FNAME, "recvmsg: %s", strerror(errno));
 		return;
 	}
 
@@ -963,14 +963,14 @@ recv_ra(s)
 		}
 	}
 	if (pi == NULL) {
-		dprintf(LOG_ERR, FNAME, "failed to get receiving packet info");
+		dbgprintf(LOG_ERR, FNAME, "failed to get receiving packet info");
 		return;
 	}
 
 	if ((ifp = find_interface(pi->ipi6_ifindex)) == NULL) {
 		char ifn[IF_NAMESIZE];
 
-		dprintf(LOG_INFO, FNAME,
+		dbgprintf(LOG_INFO, FNAME,
 		    "received a packet from %s on an unexpected interface: %s",
 		    addr2str((struct sockaddr *)&from),
 		    if_indextoname(pi->ipi6_ifindex, ifn));
@@ -980,13 +980,13 @@ recv_ra(s)
 	icp = (struct icmp6_hdr *)rcvmhdr.msg_iov[0].iov_base;
 	if (icp->icmp6_type != ND_ROUTER_ADVERT) {
 		/* XXX: impossible */
-		dprintf(LOG_ERR, FNAME,
+		dbgprintf(LOG_ERR, FNAME,
 		    "unexpected icmp type (%d) from %s on %s",
 		    icp->icmp6_type, addr2str((struct sockaddr *)&from),
 		    ifp->ifname);
 	}
 
-	dprintf(LOG_DEBUG, FNAME, "received a packet from %s to %s on %s",
+	dbgprintf(LOG_DEBUG, FNAME, "received a packet from %s to %s on %s",
 	    addr2str((struct sockaddr *)&from),
 	    in6addr2str(&pi->ipi6_addr, 0), ifp->ifname);
 
@@ -996,7 +996,7 @@ recv_ra(s)
 		struct router *rtp;
 
 		if ((rtp = find_router(&from.sin6_addr, ifp)) != NULL) {
-			dprintf(LOG_INFO, FNAME,
+			dbgprintf(LOG_INFO, FNAME,
 			    "a bogus router %s was purged",
 			    addr2str((struct sockaddr *)&from));
 			remove_router(rtp);
@@ -1011,7 +1011,7 @@ recv_ra(s)
 	for (hdr = (struct nd_opt_hdr *)(rap + 1), optlen = 0; resid > 0;
 	    resid -= optlen) {
 		if (resid < sizeof(struct nd_opt_hdr)) {
-			dprintf(LOG_INFO, FNAME,
+			dbgprintf(LOG_INFO, FNAME,
 			    "short RA option header from %s",
 			    addr2str((struct sockaddr *)&from));
 			break;
@@ -1020,14 +1020,14 @@ recv_ra(s)
 		hdr = (struct nd_opt_hdr *)((caddr_t)hdr + optlen);
 		optlen = hdr->nd_opt_len << 3;
 		if (hdr->nd_opt_len == 0) {
-			dprintf(LOG_INFO, FNAME,
+			dbgprintf(LOG_INFO, FNAME,
 			    "bad ND option: 0 length (type = %d) from %s",
 			    hdr->nd_opt_type,
 			    addr2str((struct sockaddr *)&from));
 			break;
 		}
 		if (resid < optlen) {
-			dprintf(LOG_INFO, FNAME,
+			dbgprintf(LOG_INFO, FNAME,
 			    "short RA for options from %s",
 			    addr2str((struct sockaddr *)&from));
 			break;
@@ -1039,7 +1039,7 @@ recv_ra(s)
 			ndpi = (struct nd_opt_prefix_info *)hdr;
 
 			if (ndpi->nd_opt_pi_len != 4) {
-				dprintf(LOG_INFO, FNAME,
+				dbgprintf(LOG_INFO, FNAME,
 				    "bad prefix information: "
 				    "invalid len (%d) from %s",
 				    ndpi->nd_opt_pi_len,
@@ -1048,7 +1048,7 @@ recv_ra(s)
 			}
 
 			if (ndpi->nd_opt_pi_prefix_len > 128) {
-				dprintf(LOG_INFO, FNAME,
+				dbgprintf(LOG_INFO, FNAME,
 				    "bad prefix information: "
 				    "invalid prefix len (%d) from %s",
 				    ndpi->nd_opt_pi_prefix_len,
@@ -1056,14 +1056,14 @@ recv_ra(s)
 				continue;
 			}
 
-			dprintf(LOG_DEBUG, FNAME,
+			dbgprintf(LOG_DEBUG, FNAME,
 			    "RA prefix: %s/%d",
 			    in6addr2str(&ndpi->nd_opt_pi_prefix, 0),
 			    ndpi->nd_opt_pi_prefix_len);
 
 			if (match_prefix(&ndpi->nd_opt_pi_prefix,
 			    ndpi->nd_opt_pi_prefix_len)) {
-				dprintf(LOG_INFO, FNAME,
+				dbgprintf(LOG_INFO, FNAME,
 				    "received a bogus prefix %s/%d from %s",
 				    in6addr2str(&ndpi->nd_opt_pi_prefix, 0),
 				    ndpi->nd_opt_pi_prefix_len,
@@ -1108,7 +1108,7 @@ check_timer()
 		rtp_next = TAILQ_NEXT(rtp, link);
 
 		if (TIMEVAL_LEQ(rtp->expire, now)) {
-			dprintf(LOG_DEBUG, FNAME,
+			dbgprintf(LOG_DEBUG, FNAME,
 			    "purge timer for %s on %s has expired",
 			    in6addr2str(&rtp->address, 0),
 			    rtp->interface->ifname);
@@ -1123,7 +1123,7 @@ check_timer()
 	}
 
 	if (TIMEVAL_EQ(timer, tm_max)) {
-		dprintf(LOG_DEBUG, FNAME, "there is no timer");
+		dbgprintf(LOG_DEBUG, FNAME, "there is no timer");
 		return (NULL);
 	} else if (TIMEVAL_LT(timer, now)) {
 		/* this may occur when the interval is too small */
@@ -1131,7 +1131,7 @@ check_timer()
 	} else
 		timeval_sub(&timer, &now, &returnval);
 
-	dprintf(LOG_DEBUG, FNAME, "New timer is %ld:%06ld",
+	dbgprintf(LOG_DEBUG, FNAME, "New timer is %ld:%06ld",
 	    (long)returnval.tv_sec, (long)returnval.tv_usec);
 
 	return (&returnval);
@@ -1178,7 +1178,7 @@ timeval_add(a, b, result)
  * Logging
  */
 static void
-dprintf(int level, const char *fname, const char *fmt, ...)
+dbgprintf(int level, const char *fname, const char *fmt, ...)
 {
 	va_list ap;
 	char logbuf[LINE_MAX];
