@@ -1,16 +1,28 @@
-This program has been initially developped by the KAME project:
-http://orange.kame.net/dev/cvsweb2.cgi/kame/kame/kame/rafixd/
+This program was initially developed by the KAME project.
 
-And has been ported to Linux by Eric Vyncke evyncke@cisco.com. January 2008.
+http://www.kame.net/
 
-There are two Makefile:
-Makefile: the original one
-Makefile.linux: the modified one (mainly defining a compile constant)
+The project can be found on Github (among other places):
 
-So, on a Linux system, you need to use:
+http://github.com/kame/kame
+
+The original BSD-only source on which this project is based is located here:
+
+http://github.com/kame/kame/tree/master/kame/kame/rafixd
+
+The program was initially ported to GNU/Linux by Eric Vyncke
+(evyncke@cisco.com) in January 2008. It has since been updated by Gordon
+Stratton (gordon.stratton@gmail.com) to continue to build on modern GNU/Linux
+systems.
+
+There are now two makefiles:
+
+- Makefile: the original makefile
+- Makefile.linux: a modified makefile for
+  GNU/Linux
+
+On a GNU/Linux system, you will use:
+
 make -f Makefile.linux
 
-NOTE: while this utility appears to work as described (sending a RA
-with lifetime=0 for the router), it does not appear to make a real
-effect on Windows XP stations...
-
+and on BSD (maybe other?) systems, the usual 'make' should suffice.
